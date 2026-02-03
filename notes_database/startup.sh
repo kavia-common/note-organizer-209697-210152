@@ -28,6 +28,13 @@ if sudo -u postgres ${PG_BIN}/pg_isready -p ${DB_PORT} > /dev/null 2>&1; then
     if [ -f "db_connection.txt" ]; then
         echo "Or use: $(cat db_connection.txt)"
     fi
+
+    # Attempt schema initialization anyway (idempotent), in case container restarted.
+    if [ -f "init_schema.sql" ]; then
+        echo "Ensuring schema is initialized..."
+        PGPASSWORD="${DB_PASSWORD}" ${PG_BIN}/psql -h localhost -p ${DB_PORT} -U ${DB_USER} -d ${DB_NAME} -f init_schema.sql \
+          || echo "⚠ Schema initialization failed (will rely on existing schema)."
+    fi
     
     echo ""
     echo "Script stopped - server already running."
@@ -128,6 +135,13 @@ GRANT CREATE ON SCHEMA public TO ${DB_USER};
 -- Show current permissions for debugging
 \dn+ public
 EOF
+
+# Initialize schema (idempotent)
+if [ -f "init_schema.sql" ]; then
+    echo "Initializing notes app schema..."
+    PGPASSWORD="${DB_PASSWORD}" ${PG_BIN}/psql -h localhost -p ${DB_PORT} -U ${DB_USER} -d ${DB_NAME} -f init_schema.sql \
+      || echo "⚠ Schema initialization failed."
+fi
 
 # Save connection command to a file
 echo "psql postgresql://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" > db_connection.txt
